@@ -13,9 +13,12 @@ def processResults():
     args = parser.parse_args()
 
     rawData = readFiles(args.dataDir)
+    # TODO validate raw data is all same wavelengths etc.?
+
     normaliseValues(rawData, args.controlValue)
-    
-    outputNormalised(rawData, args.dataDir)
+
+    sampleData = convertToSampleOriented(rawData, args.controlValue)
+    outputSampleData(sampleData, args.dataDir)
 
 def readFiles(dataDir):
     """Read data files from the passed in data directory."""
@@ -83,21 +86,41 @@ def normaliseValues(rawData, controlValue):
                 rawData[hour]["samples"][sampleName][i] -= controlData[i]
 
 
-def outputNormalised(rawData, dataDir):
-    """Outputs normalised data back to CSVs."""
-    
-    outputDir = dataDir + "/normalised"
+def convertToSampleOriented(rawData, controlValue):
+    """Takes raw data split by hour and converts to be split by sample."""
+
+    sampleData = {}
+    wavelengths = rawData["0"]["wavelengths"]
+
+    for hour in rawData:
+        for sample in rawData[hour]["samples"]:
+            # Ignore control sample as values will now all be 0
+            if sample == controlValue:
+                continue
+
+            if not(sample in sampleData):
+                sampleData[sample] = {"wavelengths": wavelengths.copy(), "hours": {}}
+
+            sampleData[sample]["hours"][hour] = rawData[hour]["samples"][sample]
+
+    return sampleData
+
+
+def outputSampleData(sampleData, dataDir):
+    """Outputs sample oriented data to CSV"""
+
+    outputDir = dataDir + "/samples"
     if not os.path.isdir(outputDir):
         os.mkdir(outputDir)
-        
-    for hour in rawData:
-        with open(outputDir + "/normalised_" + hour + "h.csv", "w", newline='') as csvFile:
+
+    for sample in sampleData:
+        with open(outputDir + "/" + sample + ".csv", "w", newline='') as csvFile:
             csvWriter = csv.writer(csvFile)
-            
-            csvWriter.writerow(["Wavelength"] + rawData[hour]["wavelengths"])
-            
-            for sample in rawData[hour]["samples"]:
-                csvWriter.writerow([sample] + rawData[hour]["samples"][sample])
-    
+
+            csvWriter.writerow(["Hour/Wavelength"] + sampleData[sample]["wavelengths"])
+
+            for hour in sorted(sampleData[sample]["hours"], key=int):
+                csvWriter.writerow([hour] + sampleData[sample]["hours"][hour])
+
 if __name__== "__main__":
     processResults()
