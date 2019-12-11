@@ -1,6 +1,11 @@
+# This import registers the 3D projection, but is otherwise unused.
+from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 unused import
+
 import argparse
 import csv
 import glob
+import numpy
+import matplotlib.pyplot as plt
 import os
 import re
 
@@ -19,6 +24,8 @@ def processResults():
 
     sampleData = convertToSampleOriented(rawData, args.controlValue)
     outputSampleData(sampleData, args.dataDir)
+
+    plotGraphs(sampleData, args.dataDir)
 
 def readFiles(dataDir):
     """Read data files from the passed in data directory."""
@@ -121,6 +128,32 @@ def outputSampleData(sampleData, dataDir):
 
             for hour in sorted(sampleData[sample]["hours"], key=int):
                 csvWriter.writerow([hour] + sampleData[sample]["hours"][hour])
+
+
+def plotGraphs(sampleData, dataDir):
+    """Plots graphs from the smaple oriented data"""
+
+    outputDir = dataDir + "/graphs"
+    if not os.path.isdir(outputDir):
+        os.mkdir(outputDir)
+
+    for sample in sampleData:
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+
+        ax.set_xlabel("Wavelength (nm)")
+        ax.set_ylabel("Hour")
+        ax.set_zlabel("")
+
+        # Plot graphs with back line first otherwise lines in front are written over it
+        for hour in sorted(sampleData[sample]["hours"], key=int, reverse=True):
+            wavelengths = sampleData[sample]["wavelengths"]
+            magnitudes = sampleData[sample]["hours"][hour]
+            ax.plot(wavelengths, magnitudes, zs=int(hour), zdir='y')
+
+        fileName = outputDir + "/" + sample
+        fig.savefig(fileName)
+        plt.close()
 
 if __name__== "__main__":
     processResults()
