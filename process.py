@@ -15,6 +15,7 @@ def processResults():
     parser = argparse.ArgumentParser()
     parser.add_argument("dataDir", help="The directory containing the raw results files")
     parser.add_argument("controlValue", help="Name of control value content in data (row that will be subtracted from others)")
+    parser.add_argument("--graphTest", help="Don't save results or graphs, instead show an example graph", action='store_true')
     args = parser.parse_args()
 
     rawData = readFiles(args.dataDir)
@@ -23,9 +24,11 @@ def processResults():
     normaliseValues(rawData, args.controlValue)
 
     sampleData = convertToSampleOriented(rawData, args.controlValue)
-    outputSampleData(sampleData, args.dataDir)
 
-    plotGraphs(sampleData, args.dataDir)
+    if not args.graphTest:
+        outputSampleData(sampleData, args.dataDir)
+
+    plotGraphs(sampleData, args.dataDir, args.graphTest)
 
 def readFiles(dataDir):
     """Read data files from the passed in data directory."""
@@ -130,7 +133,7 @@ def outputSampleData(sampleData, dataDir):
                 csvWriter.writerow([hour] + sampleData[sample]["hours"][hour])
 
 
-def plotGraphs(sampleData, dataDir):
+def plotGraphs(sampleData, dataDir, graphTest):
     """Plots graphs from the smaple oriented data"""
 
     outputDir = dataDir + "/graphs"
@@ -150,6 +153,10 @@ def plotGraphs(sampleData, dataDir):
             wavelengths = sampleData[sample]["wavelengths"]
             magnitudes = sampleData[sample]["hours"][hour]
             ax.plot(wavelengths, magnitudes, zs=int(hour), zdir='y')
+
+        if graphTest:
+            plt.show()
+            return
 
         fileName = outputDir + "/" + sample
         fig.savefig(fileName)
