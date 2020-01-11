@@ -15,6 +15,7 @@ def processResults():
     parser = argparse.ArgumentParser()
     parser.add_argument("dataDir", help="The directory containing the raw results files")
     parser.add_argument("controlValue", help="Name of control value content in data (row that will be subtracted from others)")
+    parser.add_argument("resultGrouping", help="Number of results to group together", type=int)
     parser.add_argument("--graphTest", help="Don't save results or graphs, instead show an example graph", action='store_true')
     args = parser.parse_args()
 
@@ -23,12 +24,12 @@ def processResults():
 
     normaliseValues(rawData, args.controlValue)
 
-    sampleData = convertToSampleOriented(rawData, args.controlValue)
+    sampleData, groupMaxes = convertToSampleOriented(rawData, args.controlValue, args.resultGrouping)
 
     if not args.graphTest:
         outputSampleData(sampleData, args.dataDir)
 
-    plotGraphs(sampleData, args.dataDir, args.graphTest)
+    plotGraphs(sampleData, args.dataDir, args.resultGrouping, groupMaxes, args.graphTest)
 
 def readFiles(dataDir):
     """Read data files from the passed in data directory."""
@@ -96,11 +97,12 @@ def normaliseValues(rawData, controlValue):
                 rawData[hour]["samples"][sampleName][i] -= controlData[i]
 
 
-def convertToSampleOriented(rawData, controlValue):
+def convertToSampleOriented(rawData, controlValue, resultGrouping):
     """Takes raw data split by hour and converts to be split by sample."""
 
     sampleData = {}
     wavelengths = rawData["0"]["wavelengths"]
+    groupMaxes = {}
 
     for hour in rawData:
         for sample in rawData[hour]["samples"]:
@@ -113,7 +115,13 @@ def convertToSampleOriented(rawData, controlValue):
 
             sampleData[sample]["hours"][hour] = rawData[hour]["samples"][sample]
 
-    return sampleData
+            groupNum = sampleGroupNum(sample, resultGrouping)
+            if not groupNum in groupMaxes:
+                groupMaxes[groupNum] = max(rawData[hour]["samples"][sample])
+            else:
+                groupMaxes[groupNum] = max(groupMaxes[groupNum], max(rawData[hour]["samples"][sample]))
+
+    return sampleData, groupMaxes
 
 
 def outputSampleData(sampleData, dataDir):
@@ -133,7 +141,7 @@ def outputSampleData(sampleData, dataDir):
                 csvWriter.writerow([hour] + sampleData[sample]["hours"][hour])
 
 
-def plotGraphs(sampleData, dataDir, graphTest):
+def plotGraphs(sampleData, dataDir, resultGrouping, groupMaxes, graphTest):
     """Plots graphs from the smaple oriented data"""
 
     outputDir = dataDir + "/graphs"
@@ -141,12 +149,18 @@ def plotGraphs(sampleData, dataDir, graphTest):
         os.mkdir(outputDir)
 
     for sample in sampleData:
+        groupNum = sampleGroupNum(sample, resultGrouping)
+        maxValue = groupMaxes[groupNum]
+        print("Sample " + sample + " max " + str(maxValue))
+
         fig = plt.figure()
         ax = fig.gca(projection='3d')
 
         ax.set_xlabel("Wavelength (nm)")
         ax.set_ylabel("Hour")
+
         ax.set_zlabel("")
+        ax.set_zlim([0, maxValue])
 
         # Plot graphs with back line first otherwise lines in front are written over it
         for hour in sorted(sampleData[sample]["hours"], key=int, reverse=True):
@@ -161,6 +175,16 @@ def plotGraphs(sampleData, dataDir, graphTest):
         fileName = outputDir + "/" + sample
         fig.savefig(fileName)
         plt.close()
+
+def sampleGroupNum(sample, resultGrouping):
+    samplePattern = re.compile(r"Sample X(\d+)", re.I)
+
+    sampleMatch = samplePattern.search(sample)
+    if not sampleMatch:
+        print("Found unexpected sample name " + sample)
+        return 0
+
+    return (int(sampleMatch.group(1)) - 1) // resultGrouping
 
 if __name__== "__main__":
     processResults()
