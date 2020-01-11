@@ -151,22 +151,23 @@ def plotGraphs(sampleData, dataDir, resultGrouping, groupMaxes, graphTest):
     for sample in sampleData:
         groupNum = sampleGroupNum(sample, resultGrouping)
         maxValue = groupMaxes[groupNum]
-        print("Sample " + sample + " max " + str(maxValue))
 
         fig = plt.figure()
         ax = fig.gca(projection='3d')
 
         ax.set_xlabel("Wavelength (nm)")
-        ax.set_ylabel("Hour")
+        ax.set_ylabel("Time (hr)")
 
         ax.set_zlabel("")
         ax.set_zlim([0, maxValue])
+
+        ax.grid(False)
 
         # Plot graphs with back line first otherwise lines in front are written over it
         for hour in sorted(sampleData[sample]["hours"], key=int, reverse=True):
             wavelengths = sampleData[sample]["wavelengths"]
             magnitudes = sampleData[sample]["hours"][hour]
-            ax.plot(wavelengths, magnitudes, zs=int(hour), zdir='y')
+            ax.plot(wavelengths, magnitudes, zs=int(hour), zdir='y', linewidth=0.8)
 
         if graphTest:
             plt.show()
