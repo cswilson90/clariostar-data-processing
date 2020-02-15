@@ -42,6 +42,12 @@ def readFiles(dataDir):
     # Get list of all CSV files
     csvFiles = glob.glob(dataDir + "/*.csv")
 
+    if len(csvFiles) == 0:
+        sys.exit("No csv files found in " + dataDir)
+    elif len(csvFiles) == 1:
+        print("Found only one CSV file, assuming all data is in there")
+        return readSingleFile(csvFiles[0])
+
     rawData = {}
     hourPattern = re.compile(r"_(\d+)h[.]csv", re.I)
     for csvFile in csvFiles:
@@ -84,6 +90,61 @@ def readFiles(dataDir):
 
     return rawData
 
+
+def readSingleFile (csvFile):
+    """Reads data from a single CSV file"""
+
+    hours = []
+    wavelengths = []
+    samples = {}
+    with open(csvFile, newline='') as fileObject:
+        dataReader = csv.reader(fileObject)
+
+        # TODO check that this is always true
+        hourRow = 7
+        wavelengthRow = 8
+        processedRows = 0
+
+        for dataRow in dataReader:
+            processedRows += 1
+
+            # Ignore rows before the hour row as they aren't needed
+            if processedRows < hourRow:
+                continue
+
+            if processedRows == hourRow:
+                # Parse hour out of "X h" string
+                hours = [hour.split(' ')[0] for hour in dataRow[3:]]
+            elif processedRows == wavelengthRow:
+                # Store wavelengths as ints
+                wavelengths = [int(wavelength) for wavelength in dataRow[3:]]
+            else:
+                sampleName = dataRow[2]
+                # Store values as ints
+                sampleValues = [int(value) for value in dataRow[3:]]
+                samples[sampleName] = sampleValues
+
+    # Get a sorted list of unique wavelength values
+    uniqueWavelengths = sorted(set(wavelengths))
+
+    rawData = {}
+    # Iterate over every column from the CSV and insert into the correct place in the results
+    for i in range(len(hours)):
+        hour = hours[i]
+        wavelength = wavelengths[i]
+
+        if not hour in rawData:
+            rawData[hour] = {}
+            rawData[hour]["samples"] = {}
+            rawData[hour]["wavelengths"] = uniqueWavelengths
+
+        for sample in samples:
+            if not sample in rawData[hour]["samples"]:
+                rawData[hour]["samples"][sample] = []
+
+            rawData[hour]["samples"][sample].append(samples[sample][i])
+
+    return rawData
 
 def normaliseValues(rawData, controlValue):
     """Subtract control values from raw data to get plottable values."""
